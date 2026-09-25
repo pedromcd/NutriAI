@@ -1,160 +1,162 @@
-# 🧠 NutriAI
+# NutriAI
 
-Aplicação web inteligente para geração de planos alimentares, receitas e suporte nutricional personalizado utilizando Inteligência Artificial.
+**AI-assisted nutrition planning platform built with React, TypeScript, Firebase, and Google Gemini.**
 
----
+NutriAI is a web application that combines structured user data with generative AI to create personalized meal plans, recipes, grocery lists, and nutrition-oriented guidance. The project explores how an LLM can be integrated into a real application while keeping user state, authentication, persistence, testing, and evidence-oriented content separated into clear software layers.
 
-## 🚀 Sobre o Projeto
+> This project is educational and is not a substitute for professional medical or nutritional advice.
 
-O **NutriAI** é uma aplicação desenvolvida como projeto acadêmico (TCC) com foco em:
+## Why this project
 
-- Nutrição personalizada
-- Geração de planos alimentares com IA
-- Sugestões de receitas
-- Educação nutricional baseada em evidências
+The main engineering goal is not only to call an LLM API, but to integrate AI into a complete product flow:
 
-O sistema utiliza modelos de IA (Google Gemini) para gerar recomendações alimentares adaptadas ao perfil do usuário.
+1. collect structured user information and preferences;
+2. persist application data securely;
+3. build prompts and AI requests from user context;
+4. return useful, structured nutrition-oriented outputs;
+5. keep AI logic isolated from UI and persistence code;
+6. test the AI service layer and related application behavior.
 
----
+## Main features
 
-## 🎯 Objetivo
+- User authentication and profile management
+- Personalized meal-plan generation
+- Recipe generation
+- Grocery-list support
+- Food substitutions and nutrition-oriented suggestions
+- AI-powered chat experience
+- Saved plans and favorite recipes
+- Daily water-intake tracking
+- Firebase-backed persistence
 
-Criar uma solução acessível que ajude usuários a:
+## AI layer
 
-- Melhorar hábitos alimentares
-- Planejar refeições de forma prática
-- Entender melhor sua alimentação
-- Receber orientações nutricionais seguras e baseadas em evidência
+The AI functionality is separated into dedicated service modules, including:
 
----
+- `services/geminiService.ts` — Gemini integration and prompt/application logic
+- `services/aiService.ts` — AI-related application abstraction
+- `services/nutritionEvidence.ts` — nutrition evidence/context used by the application
+- automated tests for the AI service layer using Vitest
 
-## 🧩 Funcionalidades
+This separation makes it easier to test AI-related behavior independently from the interface and to evolve model/prompt logic without tightly coupling it to React components.
 
-### 👤 Perfil do Usuário
-- Cadastro com dados básicos (idade, peso, altura, sexo)
-- Definição de objetivo:
-  - Perder peso
-  - Manter peso
-  - Ganhar massa muscular
-- Alergias e restrições alimentares
+## Architecture
 
----
+```text
+User Interface
+    ↓
+React / TypeScript application
+    ↓
+Application hooks and services
+    ├── Gemini AI services
+    ├── Nutrition evidence/context
+    └── Firebase services
+            ↓
+    Authentication + Firestore
+```
 
-### 🥗 Planejador Alimentar (IA)
-- Geração de plano alimentar diário
-- Cálculo de macronutrientes
-- Lista de compras automática
-- Sugestões de substituição de alimentos
+The repository is organized around modular UI components, hooks, services, shared types, and application-level state.
 
----
+```text
+NutriAI/
+├── components/             # UI components and screens
+├── hooks/                  # Reusable application/state logic
+├── services/
+│   ├── aiService.ts
+│   ├── geminiService.ts
+│   ├── nutritionEvidence.ts
+│   ├── firebase.ts
+│   └── *.test.ts           # AI service tests
+├── App.tsx
+├── MainApp.tsx
+├── types.ts
+├── firestore.rules
+├── vite.config.ts
+└── vitest.config.ts
+```
 
-### 🍳 Receitas Inteligentes
-- Geração de receitas com base em pedido do usuário
-- Informações nutricionais por porção
-- Instruções passo a passo
+## Tech stack
 
----
-
-### 💬 Chat Nutricional
-- Assistente inteligente focado em nutrição
-- Respostas baseadas em evidência
-- Personalizado com dados do usuário
-
----
-
-### 💾 Salvamento de Dados
-- Planos alimentares salvos
-- Receitas favoritas
-- Persistência com Firebase
-
----
-
-### 💧 Monitor de Água
-- Controle simples de ingestão diária
-
----
-
-## 🏗️ Tecnologias Utilizadas
-
-### Frontend
-- React
+**Frontend**
+- React 19
 - TypeScript
 - Vite
-- TailwindCSS
+- Tailwind CSS
 
-### Backend (BaaS)
+**AI**
+- Google Gemini via `@google/genai`
+
+**Data and authentication**
 - Firebase Authentication
-- Firestore Database
+- Cloud Firestore
+- Firestore security rules
 
-### Inteligência Artificial
-- Google Gemini API
+**Quality and deployment**
+- Vitest
+- ESLint
+- Prettier
+- Cloudflare / Wrangler configuration
 
----
+## Engineering considerations
 
-## 🧠 Arquitetura
+### Structured application context
+AI requests are generated from explicit user information such as goals, dietary restrictions, and preferences instead of relying only on free-form chat input.
 
-O projeto segue uma arquitetura modular:
+### Separation of concerns
+AI integration, Firebase access, UI components, and reusable hooks are kept in separate modules.
 
-```bash
-src/
-├── components/ # UI e telas
-├── hooks/ # Lógica reutilizável (estado, firestore)
-├── services/ # Integrações (Gemini, Firebase)
-├── types/ # Tipagens do sistema
-├── App.tsx # Controle principal
-├── MainApp.tsx # Fluxo da aplicação
-```
----
+### Testability
+The repository includes automated tests for AI service behavior and provides scripts for linting, type checking, and testing.
 
-## 🔐 Variáveis de Ambiente
+### Safety-oriented product design
+The application treats generated content as guidance rather than professional diagnosis or treatment and keeps nutrition evidence/context separate from model-generation code.
 
-Crie um arquivo `.env` na raiz com:
+## Local setup
 
-Gemini
-```bash
-VITE_GEMINI_API_KEY=
-```
-Firebase
-```bash
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-```
----
-
-## ▶️ Como Rodar o Projeto
+Clone the repository and install dependencies:
 
 ```bash
-# Instalar dependências
+git clone https://github.com/pedromcd/NutriAI.git
+cd NutriAI
 npm install
+```
 
-# Rodar em desenvolvimento
+Create a `.env` file based on `.env.example` and configure the required Gemini and Firebase variables.
+
+Then run:
+
+```bash
 npm run dev
 ```
 
-## Configuração local
+## Available scripts
 
-1. Instalar dependências:
 ```bash
-   `npm install`
-```   
-2. Criar arquivo `.env` a partir de `.env.example`.
-3. Preencha pelo menos `VITE_GEMINI_API_KEY` e as variáveis do Firebase.
-4. Rode o app:
-```bash
-   `npm run dev`
+npm run dev        # development server
+npm run build      # production build
+npm run preview    # local preview
+npm run lint       # ESLint checks
+npm run typecheck  # TypeScript checks
+npm run test       # automated tests
+npm run format     # Prettier
+npm run deploy     # build and deploy with Wrangler
 ```
 
-## Scripts
-```bash
-- `npm run dev` # servidor local
-- `npm run build` # build de produção
-- `npm run preview` # pré-visualização do build
-- `npm run lint` # checagem de lint
-- `npm run typecheck` # checagem TypeScript
-- `npm run test` # testes automatizados
-- `npm run format` # formatação com Prettier
-```
+## Possible research / technical extensions
+
+The project can be extended beyond product development into AI evaluation topics such as:
+
+- comparing prompt strategies for consistency and constraint adherence;
+- evaluating structured-output reliability;
+- grounding generated responses in curated nutrition evidence;
+- measuring hallucination and unsupported-claim rates;
+- comparing models on personalization quality;
+- adding retrieval-augmented generation (RAG) over trusted nutrition sources.
+
+These directions are especially relevant to my broader interests in reliable LLM systems, information retrieval, and applied AI.
+
+## Author
+
+**Pedro Marques Correa Domingues**  
+B.Sc. Computer Science candidate, Brazil  
+[Portfolio](https://pedromcd.github.io) · [GitHub](https://github.com/pedromcd)

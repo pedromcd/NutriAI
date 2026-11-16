@@ -1,3 +1,5 @@
+**English** | [Português](README.pt-BR.md)
+
 # NutriAI
 
 **AI-assisted nutrition planning platform built with React, TypeScript, Firebase, and Google Gemini.**

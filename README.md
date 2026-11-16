@@ -1,164 +1,195 @@
 **English** | [Português](README.pt-BR.md)
 
-# NutriAI
+# 🥗 NutriAI
 
-**AI-assisted nutrition planning platform built with React, TypeScript, Firebase, and Google Gemini.**
+**An AI-powered nutrition web app that generates personalized meal plans, recipes, shopping lists, and daily tips, grounded in a curated evidence base and served through a Cloudflare Worker proxy with automatic fallback across three LLM providers.**
 
-NutriAI is a web application that combines structured user data with generative AI to create personalized meal plans, recipes, grocery lists, and nutrition-oriented guidance. The project explores how an LLM can be integrated into a real application while keeping user state, authentication, persistence, testing, and evidence-oriented content separated into clear software layers.
+Built with React 19, TypeScript, Firebase, and Gemini as a **capstone project (TCC)** for the Computer Science program at UNISAGRADO, by a team of three.
 
-> This project is educational and is not a substitute for professional medical or nutritional advice.
+> Educational project. It does not replace guidance from a doctor or a registered dietitian.
 
-## Why this project
+---
 
-The main engineering goal is not only to call an LLM API, but to integrate AI into a complete product flow:
+## 🎯 Problem and goal
 
-1. collect structured user information and preferences;
-2. persist application data securely;
-3. build prompts and AI requests from user context;
-4. return useful, structured nutrition-oriented outputs;
-5. keep AI logic isolated from UI and persistence code;
-6. test the AI service layer and related application behavior.
+Generic diet plans ignore the person's body, goal, allergies, and restrictions, while professional follow-up is not always accessible. NutriAI explores how **generative AI can personalize nutrition guidance responsibly**:
 
-## Main features
+- every request is built from a **structured user profile**, not from free-form chat alone;
+- every prompt carries a **curated evidence base** (WHO and other public-health guidance) to steer the model toward established recommendations;
+- outputs are **structured JSON** that the app can validate, display, save, and export.
 
-- User authentication and profile management
-- Personalized meal-plan generation
-- Recipe generation
-- Grocery-list support
-- Food substitutions and nutrition-oriented suggestions
-- AI-powered chat experience
-- Saved plans and favorite recipes
-- Daily water-intake tracking
-- Firebase-backed persistence
+The engineering goal was to treat the LLM as **one component of a real product**, with authentication, persistence, error handling, testing, and secure API-key management.
 
-## AI layer
+---
 
-The AI functionality is separated into dedicated service modules, including:
+## ✨ Features
 
-- `services/geminiService.ts` — Gemini integration and prompt/application logic
-- `services/aiService.ts` — AI-related application abstraction
-- `services/nutritionEvidence.ts` — nutrition evidence/context used by the application
-- automated tests for the AI service layer using Vitest
+- **Onboarding and profile:** age, weight, height, sex, goal (*lose weight*, *maintain weight*, *gain muscle*), allergies, and dietary restrictions.
+- **Personalized meal plan:** daily meals with descriptions, ingredients in grams, macronutrients (calories, protein, carbs, fat), and a **shopping list**.
+- **Meal replacement:** swap a single meal while keeping the rest of the plan.
+- **Recipe generator** from a free-text request.
+- **Nutrition chat** that knows the user's profile.
+- **Daily tip** tailored to the profile.
+- **Saved plans and favorite recipes**, with **PDF export** of a plan.
+- **Water-intake tracker.**
+- **Light and dark themes.**
+- **Authentication and persistence** with Firebase Auth and Cloud Firestore, protected by Firestore security rules.
 
-This separation makes it easier to test AI-related behavior independently from the interface and to evolve model/prompt logic without tightly coupling it to React components.
+The interface is in Portuguese.
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```text
-User Interface
-    ↓
-React / TypeScript application
-    ↓
-Application hooks and services
-    ├── Gemini AI services
-    ├── Nutrition evidence/context
-    └── Firebase services
-            ↓
-    Authentication + Firestore
+┌───────────────────────────────┐
+│  React + TypeScript (Vite)    │
+│  components / hooks / types   │
+└───────┬───────────────┬───────┘
+        │               │
+        │ Firebase SDK  │ POST { prompt, json }
+        ▼               ▼
+┌──────────────┐  ┌──────────────────────────────────────────┐
+│ Firebase     │  │ Cloudflare Worker proxy (nutriai-proxy)  │
+│ Auth +       │  │                                          │
+│ Firestore    │  │  1. Gemini 2.5 Flash  ──fails──┐         │
+└──────────────┘  │  2. Groq              ◄────────┘──fails─┐│
+                  │  3. OpenRouter        ◄─────────────────┘│
+                  │                                          │
+                  │  strip <think> blocks → extract JSON     │
+                  │  API keys stored as Worker secrets       │
+                  └──────────────────────────────────────────┘
 ```
 
-The repository is organized around modular UI components, hooks, services, shared types, and application-level state.
+### The AI proxy (`proxy/`)
 
-```text
-NutriAI/
-├── components/             # UI components and screens
-├── hooks/                  # Reusable application/state logic
-├── services/
-│   ├── aiService.ts
-│   ├── geminiService.ts
-│   ├── nutritionEvidence.ts
-│   ├── firebase.ts
-│   └── *.test.ts           # AI service tests
-├── App.tsx
-├── MainApp.tsx
-├── types.ts
-├── firestore.rules
-├── vite.config.ts
-└── vitest.config.ts
-```
+The meal-plan, recipe, meal-replacement, and daily-tip features call a **Cloudflare Worker** instead of calling the LLM providers from the browser:
 
-## Tech stack
+- **API keys stay on the server** as Worker secrets and never reach the client bundle.
+- **Provider fallback:** the Worker tries **Gemini 2.5 Flash**, then **Groq**, then **OpenRouter**. If one provider is down or rate-limited, the next one answers, and the user never sees the failure. If all three fail, it returns a 502 with each provider's error.
+- **JSON mode:** when the app needs structured output, the Worker asks Gemini for `application/json`, removes Markdown fences, and checks that the result parses before returning it. If a provider answers with invalid JSON, the Worker treats it as a failure and moves on to the next provider.
+- **Reasoning cleanup:** `<think>…</think>` blocks that some reasoning models emit are removed, so only the final answer reaches the app.
+- Models are configured in one place, which makes swapping a free-tier model a one-line change.
 
-**Frontend**
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS
+### Evidence grounding (`services/nutritionEvidence.ts`)
 
-**AI**
-- Google Gemini via `@google/genai`
+A small, curated base of **evidence summaries with sources** (for example, WHO guidance on fruit and vegetable intake, free sugars, and fat quality) is written in original wording and **injected into every prompt**. This keeps recommendations aligned with established public-health guidance and makes the grounding auditable.
 
-**Data and authentication**
-- Firebase Authentication
-- Cloud Firestore
-- Firestore security rules
+### Service layer (`services/`)
 
-**Quality and deployment**
-- Vitest
-- ESLint
-- Prettier
-- Cloudflare / Wrangler configuration
+| Module | Responsibility |
+|---|---|
+| `geminiService.ts` | Builds the prompts from the profile and the evidence base; meal plan, recipe, meal replacement, daily tip, and chat session; user-friendly error messages |
+| `proxyService.ts` | Single point of communication with the Worker |
+| `aiService.ts` | Direct provider calls with fallback (used by the parts not yet migrated to the proxy) |
+| `nutritionEvidence.ts` | Curated evidence base and prompt context |
+| `firebase.ts` | Firebase initialization |
 
-## Engineering considerations
+---
 
-### Structured application context
-AI requests are generated from explicit user information such as goals, dietary restrictions, and preferences instead of relying only on free-form chat input.
+## 👨‍💻 My contribution
 
-### Separation of concerns
-AI integration, Firebase access, UI components, and reusable hooks are kept in separate modules.
+Team project (3 members). My main contributions were the **AI layer**: the AI services, the integration of the generation features with the profile, and the **Cloudflare Worker proxy** with server-side keys and multi-provider fallback, plus related changes to the onboarding and main app flow.
 
-### Testability
-The repository includes automated tests for AI service behavior and provides scripts for linting, type checking, and testing.
+---
 
-### Safety-oriented product design
-The application treats generated content as guidance rather than professional diagnosis or treatment and keeps nutrition evidence/context separate from model-generation code.
+## 🛠️ Tech stack
 
-## Local setup
+| Area | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| AI | Google Gemini (`@google/genai`), Groq, OpenRouter |
+| Backend / infrastructure | Cloudflare Workers (Wrangler) |
+| Data and auth | Firebase Authentication, Cloud Firestore, Firestore security rules |
+| Other | jsPDF (PDF export) |
+| Quality | Vitest, ESLint, Prettier, `tsc --noEmit` |
 
-Clone the repository and install dependencies:
+---
+
+## ▶️ Running locally
+
+### 1. App
 
 ```bash
 git clone https://github.com/pedromcd/NutriAI.git
 cd NutriAI
 npm install
+cp .env.example .env
 ```
 
-Create a `.env` file based on `.env.example` and configure the required Gemini and Firebase variables.
+Fill in `.env` with your Firebase project settings, add the proxy URL, and optionally add provider keys for the features that still call providers directly:
 
-Then run:
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+
+VITE_PROXY_URL=https://nutriai-proxy.<your-subdomain>.workers.dev
+VITE_GEMINI_API_KEY=...
+```
 
 ```bash
 npm run dev
 ```
 
-## Available scripts
+See `FIREBASE_SETUP.md` for the Firebase configuration.
+
+### 2. AI proxy
+
+```bash
+cd proxy
+npm install
+npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put GROQ_API_KEY
+npx wrangler secret put OPENROUTER_API_KEY
+npx wrangler deploy
+```
+
+### Scripts
 
 ```bash
 npm run dev        # development server
 npm run build      # production build
-npm run preview    # local preview
-npm run lint       # ESLint checks
+npm run lint       # ESLint
 npm run typecheck  # TypeScript checks
-npm run test       # automated tests
+npm run test       # Vitest
 npm run format     # Prettier
 npm run deploy     # build and deploy with Wrangler
 ```
 
-## Possible research / technical extensions
+---
 
-The project can be extended beyond product development into AI evaluation topics such as:
+## 🧩 Structure
 
-- comparing prompt strategies for consistency and constraint adherence;
-- evaluating structured-output reliability;
-- grounding generated responses in curated nutrition evidence;
-- measuring hallucination and unsupported-claim rates;
-- comparing models on personalization quality;
-- adding retrieval-augmented generation (RAG) over trusted nutrition sources.
+```text
+NutriAI/
+├── components/          # Screens: Auth, Onboarding, Home, Planner, Recipes, Chatbot, SavedPlans, WaterTracker…
+├── hooks/               # useAuth, useFirestore, useTheme, local-storage hooks
+├── services/            # AI services, proxy client, evidence base, Firebase (+ tests)
+├── proxy/               # Cloudflare Worker: multi-provider LLM proxy (+ tests)
+├── types.ts             # UserProfile, MealPlan, Recipe, NutritionInfo…
+├── firestore.rules      # Firestore security rules
+└── vite.config.ts / vitest.config.ts / wrangler.jsonc
+```
 
-These directions are especially relevant to my broader interests in reliable LLM systems, information retrieval, and applied AI.
+---
 
-## Author
+## 🚧 Limitations and next steps
 
-**Pedro Marques Correa Domingues**  
-B.Sc. Computer Science candidate, Brazil  
+- **Finish the migration to the proxy:** the chat still calls Gemini from the browser, so its key is in the client bundle. Moving it to the Worker removes all keys from the frontend.
+- **Harden the proxy:** restrict CORS to the app's domain and add rate limiting per user.
+- **Evaluate the outputs:** check generated plans against the profile (calorie targets, allergies, restrictions) automatically and measure how often a plan violates a constraint.
+- **Retrieval-augmented generation (RAG):** retrieve only the evidence relevant to each request from a larger, trusted source base, instead of sending the whole base in every prompt.
+
+---
+
+## 👥 Authors
+
+- Pedro Marques Correa Domingues
+- João Matheus Veríssimo Francisco
+- Thiago Galli
+
 [Portfolio](https://pedromcd.github.io) · [GitHub](https://github.com/pedromcd)

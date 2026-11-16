@@ -1,164 +1,193 @@
 [English](README.md) | **Português**
 
-# NutriAI
+# 🥗 NutriAI
 
-**Plataforma de planejamento nutricional assistida por IA, construída com React, TypeScript, Firebase e Google Gemini.**
+**Aplicação web de nutrição com IA que gera planos alimentares, receitas, listas de compras e dicas diárias personalizados, embasados em uma base de evidências curada e servidos por um proxy em Cloudflare Worker com fallback automático entre três provedores de LLM.**
 
-O NutriAI é uma aplicação web que combina dados estruturados do usuário com IA generativa para criar planos alimentares, receitas, listas de compras e orientações nutricionais personalizados. O projeto explora como integrar um LLM em uma aplicação real, mantendo estado do usuário, autenticação, persistência, testes e conteúdo baseado em evidências separados em camadas de software bem definidas.
+Construída com React 19, TypeScript, Firebase e Gemini como **Trabalho de Conclusão de Curso (TCC)** de Ciência da Computação na UNISAGRADO, por uma equipe de três pessoas.
 
-> Este projeto é educacional e não substitui orientação médica ou nutricional profissional.
+> Projeto educacional. Não substitui a orientação de um médico ou nutricionista.
 
-## Por que este projeto
+---
 
-O principal objetivo de engenharia não é apenas chamar a API de um LLM, mas integrar a IA a um fluxo de produto completo:
+## 🎯 Problema e objetivo
 
-1. coletar informações e preferências estruturadas do usuário;
-2. persistir os dados da aplicação com segurança;
-3. montar prompts e requisições de IA a partir do contexto do usuário;
-4. retornar saídas nutricionais úteis e estruturadas;
-5. manter a lógica de IA isolada do código de interface e de persistência;
-6. testar a camada de serviços de IA e o comportamento relacionado da aplicação.
+Dietas genéricas ignoram o corpo, o objetivo, as alergias e as restrições de cada pessoa, e o acompanhamento profissional nem sempre é acessível. O NutriAI explora como a **IA generativa pode personalizar orientações nutricionais de forma responsável**:
 
-## Principais funcionalidades
+- cada requisição é montada a partir de um **perfil estruturado do usuário**, e não só de mensagens livres no chat;
+- cada prompt leva uma **base de evidências curada** (orientações da OMS e de outras fontes de saúde pública) para guiar o modelo em direção a recomendações consolidadas;
+- as respostas vêm em **JSON estruturado**, que o app consegue validar, exibir, salvar e exportar.
 
-- Autenticação de usuários e gestão de perfil
-- Geração de planos alimentares personalizados
-- Geração de receitas
-- Suporte a listas de compras
-- Substituições de alimentos e sugestões nutricionais
-- Chat com IA
-- Planos salvos e receitas favoritas
-- Controle diário de consumo de água
-- Persistência com Firebase
+O objetivo de engenharia foi tratar o LLM como **um componente de um produto real**, com autenticação, persistência, tratamento de erros, testes e gestão segura das chaves de API.
 
-## Camada de IA
+---
 
-A funcionalidade de IA fica separada em módulos de serviço dedicados, incluindo:
+## ✨ Funcionalidades
 
-- `services/geminiService.ts` — integração com o Gemini e lógica de prompts/aplicação
-- `services/aiService.ts` — abstração da aplicação para recursos de IA
-- `services/nutritionEvidence.ts` — evidências/contexto nutricional usados pela aplicação
-- testes automatizados da camada de serviços de IA com Vitest
+- **Onboarding e perfil:** idade, peso, altura, sexo, objetivo (*perder peso*, *manter o peso*, *ganhar massa muscular*), alergias e restrições alimentares.
+- **Plano alimentar personalizado:** refeições do dia com descrição, ingredientes em gramas, macronutrientes (calorias, proteínas, carboidratos e gorduras) e **lista de compras**.
+- **Troca de refeição:** substitui uma refeição específica mantendo o restante do plano.
+- **Gerador de receitas** a partir de um pedido em texto livre.
+- **Chat de nutrição** que conhece o perfil do usuário.
+- **Dica diária** de acordo com o perfil.
+- **Planos salvos e receitas favoritas**, com **exportação do plano em PDF**.
+- **Controle de consumo de água.**
+- **Tema claro e escuro.**
+- **Autenticação e persistência** com Firebase Auth e Cloud Firestore, protegidas por regras de segurança do Firestore.
 
-Essa separação facilita testar o comportamento relacionado à IA independentemente da interface e evoluir a lógica de modelo/prompts sem acoplá-la aos componentes React.
+---
 
-## Arquitetura
+## 🏗️ Arquitetura
 
 ```text
-Interface do usuário
-    ↓
-Aplicação React / TypeScript
-    ↓
-Hooks e serviços da aplicação
-    ├── Serviços de IA do Gemini
-    ├── Evidências/contexto nutricional
-    └── Serviços do Firebase
-            ↓
-    Autenticação + Firestore
+┌───────────────────────────────┐
+│  React + TypeScript (Vite)    │
+│  components / hooks / types   │
+└───────┬───────────────┬───────┘
+        │               │
+        │ SDK Firebase  │ POST { prompt, json }
+        ▼               ▼
+┌──────────────┐  ┌──────────────────────────────────────────┐
+│ Firebase     │  │ Proxy Cloudflare Worker (nutriai-proxy)  │
+│ Auth +       │  │                                          │
+│ Firestore    │  │  1. Gemini 2.5 Flash  ──falhou──┐        │
+└──────────────┘  │  2. Groq              ◄─────────┘─falhou┐│
+                  │  3. OpenRouter        ◄─────────────────┘│
+                  │                                          │
+                  │  remove blocos <think> → extrai o JSON   │
+                  │  chaves de API guardadas como secrets    │
+                  └──────────────────────────────────────────┘
 ```
 
-O repositório é organizado em componentes de interface modulares, hooks, serviços, tipos compartilhados e estado da aplicação.
+### O proxy de IA (`proxy/`)
 
-```text
-NutriAI/
-├── components/             # Componentes e telas da interface
-├── hooks/                  # Lógica reutilizável de aplicação/estado
-├── services/
-│   ├── aiService.ts
-│   ├── geminiService.ts
-│   ├── nutritionEvidence.ts
-│   ├── firebase.ts
-│   └── *.test.ts           # Testes dos serviços de IA
-├── App.tsx
-├── MainApp.tsx
-├── types.ts
-├── firestore.rules
-├── vite.config.ts
-└── vitest.config.ts
-```
+As funções de plano alimentar, receita, troca de refeição e dica diária chamam um **Cloudflare Worker** em vez de chamar os provedores de LLM direto do navegador:
 
-## Stack
+- **As chaves de API ficam no servidor**, como secrets do Worker, e nunca chegam ao bundle do cliente.
+- **Fallback entre provedores:** o Worker tenta o **Gemini 2.5 Flash**, depois o **Groq** e depois a **OpenRouter**. Se um provedor estiver fora do ar ou com limite atingido, o próximo responde, e o usuário nem percebe a falha. Se os três falharem, ele retorna 502 com o erro de cada provedor.
+- **Modo JSON:** quando o app precisa de saída estruturada, o Worker pede `application/json` ao Gemini, remove as cercas de Markdown e confere se o resultado é um JSON válido antes de devolvê-lo. Se um provedor responder com JSON inválido, o Worker trata como falha e passa para o próximo.
+- **Limpeza do raciocínio:** blocos `<think>…</think>` que alguns modelos de raciocínio geram são removidos, para que só a resposta final chegue ao app.
+- Os modelos ficam configurados em um único lugar, então trocar um modelo gratuito é uma mudança de uma linha.
 
-**Frontend**
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS
+### Embasamento em evidências (`services/nutritionEvidence.ts`)
 
-**IA**
-- Google Gemini via `@google/genai`
+Uma base pequena e curada de **resumos de evidências com fonte** (por exemplo, orientações da OMS sobre consumo de frutas e verduras, açúcares livres e qualidade das gorduras) foi escrita com redação própria e é **inserida em todos os prompts**. Isso mantém as recomendações alinhadas com as orientações de saúde pública e deixa o embasamento auditável.
 
-**Dados e autenticação**
-- Firebase Authentication
-- Cloud Firestore
-- Regras de segurança do Firestore
+### Camada de serviços (`services/`)
 
-**Qualidade e deploy**
-- Vitest
-- ESLint
-- Prettier
-- Configuração Cloudflare / Wrangler
+| Módulo | Responsabilidade |
+|---|---|
+| `geminiService.ts` | Monta os prompts a partir do perfil e da base de evidências; plano alimentar, receita, troca de refeição, dica diária e sessão de chat; mensagens de erro amigáveis |
+| `proxyService.ts` | Ponto único de comunicação com o Worker |
+| `aiService.ts` | Chamadas diretas aos provedores, com fallback (usado pelas partes ainda não migradas para o proxy) |
+| `nutritionEvidence.ts` | Base de evidências curada e contexto para os prompts |
+| `firebase.ts` | Inicialização do Firebase |
 
-## Considerações de engenharia
+---
 
-### Contexto estruturado da aplicação
-As requisições de IA são geradas a partir de informações explícitas do usuário, como objetivos, restrições alimentares e preferências, em vez de depender apenas de mensagens livres no chat.
+## 👨‍💻 Minha contribuição
 
-### Separação de responsabilidades
-A integração com IA, o acesso ao Firebase, os componentes de interface e os hooks reutilizáveis ficam em módulos separados.
+Projeto em equipe (3 integrantes). Minhas principais contribuições foram na **camada de IA**: os serviços de IA, a integração das funções de geração com o perfil e o **proxy em Cloudflare Worker**, com chaves no servidor e fallback entre provedores, além de ajustes no onboarding e no fluxo principal do app.
 
-### Testabilidade
-O repositório inclui testes automatizados do comportamento dos serviços de IA e scripts para lint, verificação de tipos e testes.
+---
 
-### Design de produto orientado à segurança
-A aplicação trata o conteúdo gerado como orientação, não como diagnóstico ou tratamento profissional, e mantém as evidências/contexto nutricional separados do código de geração do modelo.
+## 🛠️ Tecnologias
 
-## Configuração local
+| Área | Tecnologias |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| IA | Google Gemini (`@google/genai`), Groq, OpenRouter |
+| Backend / infraestrutura | Cloudflare Workers (Wrangler) |
+| Dados e autenticação | Firebase Authentication, Cloud Firestore, regras de segurança do Firestore |
+| Outros | jsPDF (exportação em PDF) |
+| Qualidade | Vitest, ESLint, Prettier, `tsc --noEmit` |
 
-Clone o repositório e instale as dependências:
+---
+
+## ▶️ Como executar localmente
+
+### 1. App
 
 ```bash
 git clone https://github.com/pedromcd/NutriAI.git
 cd NutriAI
 npm install
+cp .env.example .env
 ```
 
-Crie um arquivo `.env` com base no `.env.example` e configure as variáveis necessárias do Gemini e do Firebase.
+Preencha o `.env` com as configurações do seu projeto Firebase, adicione a URL do proxy e, se quiser, as chaves dos provedores para as funções que ainda chamam os provedores diretamente:
 
-Depois execute:
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+
+VITE_PROXY_URL=https://nutriai-proxy.<seu-subdominio>.workers.dev
+VITE_GEMINI_API_KEY=...
+```
 
 ```bash
 npm run dev
 ```
 
-## Scripts disponíveis
+Veja o `FIREBASE_SETUP.md` para a configuração do Firebase.
+
+### 2. Proxy de IA
+
+```bash
+cd proxy
+npm install
+npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put GROQ_API_KEY
+npx wrangler secret put OPENROUTER_API_KEY
+npx wrangler deploy
+```
+
+### Scripts
 
 ```bash
 npm run dev        # servidor de desenvolvimento
 npm run build      # build de produção
-npm run preview    # preview local
-npm run lint       # verificações do ESLint
-npm run typecheck  # verificações do TypeScript
-npm run test       # testes automatizados
+npm run lint       # ESLint
+npm run typecheck  # verificação do TypeScript
+npm run test       # Vitest
 npm run format     # Prettier
 npm run deploy     # build e deploy com Wrangler
 ```
 
-## Possíveis extensões técnicas / de pesquisa
+---
 
-O projeto pode ir além do desenvolvimento de produto e abordar temas de avaliação de IA, como:
+## 🧩 Estrutura
 
-- comparar estratégias de prompt quanto à consistência e ao respeito às restrições;
-- avaliar a confiabilidade das saídas estruturadas;
-- embasar as respostas geradas em evidências nutricionais curadas;
-- medir taxas de alucinação e de afirmações sem embasamento;
-- comparar modelos quanto à qualidade da personalização;
-- adicionar retrieval-augmented generation (RAG) sobre fontes nutricionais confiáveis.
+```text
+NutriAI/
+├── components/          # Telas: Auth, Onboarding, Home, Planner, Recipes, Chatbot, SavedPlans, WaterTracker…
+├── hooks/               # useAuth, useFirestore, useTheme, hooks de localStorage
+├── services/            # Serviços de IA, cliente do proxy, base de evidências, Firebase (+ testes)
+├── proxy/               # Cloudflare Worker: proxy de LLM com vários provedores (+ testes)
+├── types.ts             # UserProfile, MealPlan, Recipe, NutritionInfo…
+├── firestore.rules      # Regras de segurança do Firestore
+└── vite.config.ts / vitest.config.ts / wrangler.jsonc
+```
 
-Essas direções são especialmente relevantes para meus interesses mais amplos em sistemas de LLM confiáveis, recuperação de informação e IA aplicada.
+---
 
-## Autor
+## 🚧 Limitações e próximos passos
 
-**Pedro Marques Correa Domingues**  
-Graduando em Ciência da Computação, Brasil  
+- **Terminar a migração para o proxy:** o chat ainda chama o Gemini direto do navegador, então a chave dele fica no bundle do cliente. Levá-lo para o Worker remove todas as chaves do frontend.
+- **Reforçar o proxy:** restringir o CORS ao domínio do app e adicionar limite de requisições por usuário.
+- **Avaliar as respostas:** conferir automaticamente os planos gerados contra o perfil (meta de calorias, alergias, restrições) e medir com que frequência um plano viola alguma restrição.
+- **RAG (Retrieval-Augmented Generation):** buscar só as evidências relevantes para cada pedido em uma base maior de fontes confiáveis, em vez de enviar a base inteira em todo prompt.
+
+---
+
+## 👥 Autores
+
+- Pedro Marques Correa Domingues
+- João Matheus Veríssimo Francisco
+- Thiago Galli
+
 [Portfólio](https://pedromcd.github.io) · [GitHub](https://github.com/pedromcd)
